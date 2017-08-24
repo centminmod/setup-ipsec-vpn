@@ -7,6 +7,10 @@
 #
 # The latest version of this script is available at:
 # https://github.com/hwdsl2/setup-ipsec-vpn
+# 
+# modified version specific to Centmin Mod LEMP stacks with CSF Firewall
+# modified by George Liu centminmod.com
+# https://github.com/centminmod/setup-ipsec-vpn
 #
 # Copyright (C) 2015-2017 Lin Song <linsongui@gmail.com>
 # Based on the work of Thomas Sarlandie (Copyright 2012)
@@ -148,9 +152,10 @@ PUBLIC_IP=${VPN_PUBLIC_IP:-''}
 check_ip "$PUBLIC_IP" || PUBLIC_IP=$(wget -t 3 -T 15 -qO- http://ipv4.icanhazip.com)
 check_ip "$PUBLIC_IP" || exiterr "Cannot find valid public IP. Edit the script and manually enter it."
 
-bigecho "Adding the EPEL repository..."
-
-yum -y install epel-release || exiterr2
+if [ ! -f /etc/yum.repos.d/epel.repo ]; then
+  bigecho "Adding the EPEL repository..."
+  yum -y install epel-release || exiterr2
+fi
 
 bigecho "Installing packages required for the VPN..."
 
@@ -168,9 +173,12 @@ else
   yum -y install iptables-services || exiterr2
 fi
 
-bigecho "Installing Fail2Ban to protect SSH..."
-
-yum -y install fail2ban || exiterr2
+# skip fail2ban install if CSF Firewall is detected as
+# SSH is already protected by CSF Firewall
+if [ ! -f /etc/csf/csf.conf ]; then
+  bigecho "Installing Fail2Ban to protect SSH..."
+  yum -y install fail2ban || exiterr2
+fi
 
 bigecho "Compiling and installing Libreswan..."
 
@@ -315,9 +323,18 @@ cat > /etc/ipsec.d/passwd <<EOF
 $VPN_USER:$VPN_PASSWORD_ENC:xauth-psk
 EOF
 
+# /etc/sysctl.d/101-sysctl.conf
 bigecho "Updating sysctl settings..."
 
-if ! grep -qs "hwdsl2 VPN script" /etc/sysctl.conf; then
+# check if centminmod lemp stack installed
+if [ -f /usr/local/src/centminmod/centmin.sh ]; then
+  CENTMINMOD='y'
+else
+  CENTMINMOD='n'
+fi
+
+# non-centminmod centos 6 or 7
+if [[ "$(grep -qs "hwdsl2 VPN script" /etc/sysctl.conf)" && "$CENTMINMOD" = [nN] ]]; then
   conf_bk "/etc/sysctl.conf"
 cat >> /etc/sysctl.conf <<EOF
 
@@ -351,6 +368,70 @@ net.ipv4.tcp_wmem = 10240 87380 12582912
 EOF
 fi
 
+# centminmod + centos 6
+# some settings already added by centminmod lemp installer
+if [[ "$(grep -qs "hwdsl2 VPN script" /etc/sysctl.conf)" && "$CENTMINMOD" = [yY] && ! -f /etc/sysctl.d/101-sysctl.conf ]]; then
+  conf_bk "/etc/sysctl.conf"
+cat >> /etc/sysctl.conf <<EOF
+
+# Added by hwdsl2 VPN script
+kernel.msgmnb = 65536
+kernel.msgmax = 65536
+kernel.shmmax = 68719476736
+kernel.shmall = 4294967296
+
+net.ipv4.ip_forward = 1
+net.ipv4.tcp_syncookies = 1
+#net.ipv4.conf.all.accept_source_route = 0
+#net.ipv4.conf.default.accept_source_route = 0
+#net.ipv4.conf.all.accept_redirects = 0
+#net.ipv4.conf.default.accept_redirects = 0
+#net.ipv4.conf.all.send_redirects = 0
+#net.ipv4.conf.default.send_redirects = 0
+net.ipv4.conf.lo.send_redirects = 0
+net.ipv4.conf.$NET_IFACE.send_redirects = 0
+net.ipv4.conf.all.rp_filter = 0
+net.ipv4.conf.default.rp_filter = 0
+net.ipv4.conf.lo.rp_filter = 0
+net.ipv4.conf.$NET_IFACE.rp_filter = 0
+#net.ipv4.icmp_echo_ignore_broadcasts = 1
+#net.ipv4.icmp_ignore_bogus_error_responses = 1
+EOF
+sed -i '/net.ipv4.conf.all.rp_filter = 1/d' /etc/sysctl.conf
+fi
+
+# centminmod + centos 7
+# some settings already added by centminmod lemp installer
+if [[ "$(grep -qs "hwdsl2 VPN script" /etc/sysctl.d/101-sysctl.conf)" && "$CENTMINMOD" = [yY] && -f /etc/sysctl.d/101-sysctl.conf ]]; then
+  conf_bk "/etc/sysctl.d/101-sysctl.conf"
+cat >> /etc/sysctl.d/101-sysctl.conf <<EOF
+
+# Added by hwdsl2 VPN script
+kernel.msgmnb = 65536
+kernel.msgmax = 65536
+kernel.shmmax = 68719476736
+kernel.shmall = 4294967296
+
+net.ipv4.ip_forward = 1
+net.ipv4.tcp_syncookies = 1
+#net.ipv4.conf.all.accept_source_route = 0
+#net.ipv4.conf.default.accept_source_route = 0
+#net.ipv4.conf.all.accept_redirects = 0
+#net.ipv4.conf.default.accept_redirects = 0
+#net.ipv4.conf.all.send_redirects = 0
+#net.ipv4.conf.default.send_redirects = 0
+net.ipv4.conf.lo.send_redirects = 0
+net.ipv4.conf.$NET_IFACE.send_redirects = 0
+net.ipv4.conf.all.rp_filter = 0
+net.ipv4.conf.default.rp_filter = 0
+net.ipv4.conf.lo.rp_filter = 0
+net.ipv4.conf.$NET_IFACE.rp_filter = 0
+#net.ipv4.icmp_echo_ignore_broadcasts = 1
+#net.ipv4.icmp_ignore_bogus_error_responses = 1
+EOF
+sed -i '/net.ipv4.conf.all.rp_filter = 1/d' /etc/sysctl.d/101-sysctl.conf
+fi
+
 bigecho "Updating IPTables rules..."
 
 # Check if IPTables rules need updating
@@ -364,33 +445,60 @@ fi
 
 # Add IPTables rules for VPN
 if [ "$ipt_flag" = "1" ]; then
-  service fail2ban stop >/dev/null 2>&1
-  iptables-save > "$IPT_FILE.old-$SYS_DT"
-  iptables -I INPUT 1 -p udp --dport 1701 -m policy --dir in --pol none -j DROP
-  iptables -I INPUT 2 -m conntrack --ctstate INVALID -j DROP
-  iptables -I INPUT 3 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
-  iptables -I INPUT 4 -p udp -m multiport --dports 500,4500 -j ACCEPT
-  iptables -I INPUT 5 -p udp --dport 1701 -m policy --dir in --pol ipsec -j ACCEPT
-  iptables -I INPUT 6 -p udp --dport 1701 -j DROP
-  iptables -I FORWARD 1 -m conntrack --ctstate INVALID -j DROP
-  iptables -I FORWARD 2 -i "$NET_IFACE" -o ppp+ -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
-  iptables -I FORWARD 3 -i ppp+ -o "$NET_IFACE" -j ACCEPT
-  iptables -I FORWARD 4 -i ppp+ -o ppp+ -s "$L2TP_NET" -d "$L2TP_NET" -j ACCEPT
-  iptables -I FORWARD 5 -i "$NET_IFACE" -d "$XAUTH_NET" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
-  iptables -I FORWARD 6 -s "$XAUTH_NET" -o "$NET_IFACE" -j ACCEPT
-  # Uncomment if you wish to disallow traffic between VPN clients themselves
-  # iptables -I FORWARD 2 -i ppp+ -o ppp+ -s "$L2TP_NET" -d "$L2TP_NET" -j DROP
-  # iptables -I FORWARD 3 -s "$XAUTH_NET" -d "$XAUTH_NET" -j DROP
-  iptables -A FORWARD -j DROP
-  iptables -t nat -I POSTROUTING -s "$XAUTH_NET" -o "$NET_IFACE" -m policy --dir out --pol none -j MASQUERADE
-  iptables -t nat -I POSTROUTING -s "$L2TP_NET" -o "$NET_IFACE" -j MASQUERADE
-  echo "# Modified by hwdsl2 VPN script" > "$IPT_FILE"
-  iptables-save >> "$IPT_FILE"
+  if [ ! -f /etc/csf/csf.conf ]; then
+    service fail2ban stop >/dev/null 2>&1
+    iptables-save > "$IPT_FILE.old-$SYS_DT"
+    iptables -I INPUT 1 -p udp --dport 1701 -m policy --dir in --pol none -j DROP
+    iptables -I INPUT 2 -m conntrack --ctstate INVALID -j DROP
+    iptables -I INPUT 3 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+    iptables -I INPUT 4 -p udp -m multiport --dports 500,4500 -j ACCEPT
+    iptables -I INPUT 5 -p udp --dport 1701 -m policy --dir in --pol ipsec -j ACCEPT
+    iptables -I INPUT 6 -p udp --dport 1701 -j DROP
+    iptables -I FORWARD 1 -m conntrack --ctstate INVALID -j DROP
+    iptables -I FORWARD 2 -i "$NET_IFACE" -o ppp+ -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+    iptables -I FORWARD 3 -i ppp+ -o "$NET_IFACE" -j ACCEPT
+    iptables -I FORWARD 4 -i ppp+ -o ppp+ -s "$L2TP_NET" -d "$L2TP_NET" -j ACCEPT
+    iptables -I FORWARD 5 -i "$NET_IFACE" -d "$XAUTH_NET" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+    iptables -I FORWARD 6 -s "$XAUTH_NET" -o "$NET_IFACE" -j ACCEPT
+    # Uncomment if you wish to disallow traffic between VPN clients themselves
+    # iptables -I FORWARD 2 -i ppp+ -o ppp+ -s "$L2TP_NET" -d "$L2TP_NET" -j DROP
+    # iptables -I FORWARD 3 -s "$XAUTH_NET" -d "$XAUTH_NET" -j DROP
+    iptables -A FORWARD -j DROP
+    iptables -t nat -I POSTROUTING -s "$XAUTH_NET" -o "$NET_IFACE" -m policy --dir out --pol none -j MASQUERADE
+    iptables -t nat -I POSTROUTING -s "$L2TP_NET" -o "$NET_IFACE" -j MASQUERADE
+    echo "# Modified by hwdsl2 VPN script" > "$IPT_FILE"
+    iptables-save >> "$IPT_FILE"
+  else
+cat >/etc/csf/csfpre.sh<<EFF
+#!/bin/bash
+iptables -I INPUT 1 -p udp --dport 1701 -m policy --dir in --pol none -j DROP
+iptables -I INPUT 2 -m conntrack --ctstate INVALID -j DROP
+iptables -I INPUT 3 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+iptables -I INPUT 4 -p udp -m multiport --dports 500,4500 -j ACCEPT
+iptables -I INPUT 5 -p udp --dport 1701 -m policy --dir in --pol ipsec -j ACCEPT
+iptables -I INPUT 6 -p udp --dport 1701 -j DROP
+iptables -I FORWARD 1 -m conntrack --ctstate INVALID -j DROP
+iptables -I FORWARD 2 -i "$NET_IFACE" -o ppp+ -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+iptables -I FORWARD 3 -i ppp+ -o "$NET_IFACE" -j ACCEPT
+iptables -I FORWARD 4 -i ppp+ -o ppp+ -s "$L2TP_NET" -d "$L2TP_NET" -j ACCEPT
+iptables -I FORWARD 5 -i "$NET_IFACE" -d "$XAUTH_NET" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+iptables -I FORWARD 6 -s "$XAUTH_NET" -o "$NET_IFACE" -j ACCEPT
+# Uncomment if you wish to disallow traffic between VPN clients themselves
+# iptables -I FORWARD 2 -i ppp+ -o ppp+ -s "$L2TP_NET" -d "$L2TP_NET" -j DROP
+# iptables -I FORWARD 3 -s "$XAUTH_NET" -d "$XAUTH_NET" -j DROP
+iptables -A FORWARD -j DROP
+iptables -t nat -I POSTROUTING -s "$XAUTH_NET" -o "$NET_IFACE" -m policy --dir out --pol none -j MASQUERADE
+iptables -t nat -I POSTROUTING -s "$L2TP_NET" -o "$NET_IFACE" -j MASQUERADE
+EFF
+  fi
 fi
 
-bigecho "Creating basic Fail2Ban rules..."
+# skip fail2ban install if CSF Firewall is detected as
+# SSH is already protected by CSF Firewall
+if [ ! -f /etc/csf/csf.conf ]; then
+  bigecho "Creating basic Fail2Ban rules..."
 
-if [ ! -f /etc/fail2ban/jail.local ] ; then
+  if [ ! -f /etc/fail2ban/jail.local ] ; then
 cat > /etc/fail2ban/jail.local <<'EOF'
 [ssh-iptables]
 enabled  = true
@@ -398,18 +506,25 @@ filter   = sshd
 action   = iptables[name=SSH, port=ssh, protocol=tcp]
 logpath  = /var/log/secure
 EOF
+  fi
 fi
 
 bigecho "Enabling services on boot..."
 
 if grep -qs "release 6" /etc/redhat-release; then
   chkconfig iptables on
-  chkconfig fail2ban on
+  if [ ! -f /etc/csf/csf.conf ]; then
+    chkconfig fail2ban on
+  fi
 else
-  systemctl --now mask firewalld 2>/dev/null
-  systemctl enable iptables fail2ban 2>/dev/null
+  if [ ! -f /etc/csf/csf.conf ]; then
+    systemctl --now mask firewalld 2>/dev/null
+    systemctl enable iptables fail2ban 2>/dev/null
+  else
+    systemctl enable iptables 2>/dev/null
+  fi
 fi
-if ! grep -qs "hwdsl2 VPN script" /etc/rc.local; then
+if [ ! "$(grep -qs "hwdsl2 VPN script" /etc/rc.local)" ]; then
   if [ -f /etc/rc.local ]; then
     conf_bk "/etc/rc.local"
   else
@@ -428,20 +543,28 @@ fi
 
 bigecho "Starting services..."
 
-# Restore SELinux contexts
-restorecon /etc/ipsec.d/*db 2>/dev/null
-restorecon /usr/local/sbin -Rv 2>/dev/null
-restorecon /usr/local/libexec/ipsec -Rv 2>/dev/null
+if [[ "$CENTMINMOD" = [nN] ]]; then
+  # Restore SELinux contexts
+  restorecon /etc/ipsec.d/*db 2>/dev/null
+  restorecon /usr/local/sbin -Rv 2>/dev/null
+  restorecon /usr/local/libexec/ipsec -Rv 2>/dev/null
+fi
 
 # Reload sysctl.conf
-sysctl -e -q -p
+if [[ -f /etc/sysctl.d/101-sysctl.conf && "$CENTMINMOD" = [yY] ]]; then
+  /sbin/sysctl --system
+else
+  sysctl -e -q -p
+fi
 
 # Update file attributes
 chmod +x /etc/rc.local
 chmod 600 /etc/ipsec.secrets* /etc/ppp/chap-secrets* /etc/ipsec.d/passwd*
 
-# Apply new IPTables rules
-iptables-restore < "$IPT_FILE"
+if [ ! -f /etc/csf/csf.conf ]; then
+  # Apply new IPTables rules
+  iptables-restore < "$IPT_FILE"
+fi
 
 # Fix xl2tpd on CentOS 7 for providers such as Linode,
 # where kernel module "l2tp_ppp" is unavailable
@@ -454,7 +577,11 @@ fi
 
 # Restart services
 modprobe -q pppol2tp
-service fail2ban restart 2>/dev/null
+if [ ! -f /etc/csf/csf.conf ]; then
+  service fail2ban restart 2>/dev/null
+elif [ -f /etc/csf/csf.conf ]; then
+  service csf restart
+fi
 service ipsec restart 2>/dev/null
 service xl2tpd restart 2>/dev/null
 
