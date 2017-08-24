@@ -490,6 +490,7 @@ iptables -A FORWARD -j DROP
 iptables -t nat -I POSTROUTING -s "$XAUTH_NET" -o "$NET_IFACE" -m policy --dir out --pol none -j MASQUERADE
 iptables -t nat -I POSTROUTING -s "$L2TP_NET" -o "$NET_IFACE" -j MASQUERADE
 EFF
+    chmod 0700 /etc/csf/csfpre.sh
   fi
 fi
 
