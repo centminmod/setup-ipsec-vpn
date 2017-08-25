@@ -154,8 +154,7 @@ cd /opt/src || exiterr "Cannot enter /opt/src."
 
 bigecho "Installing packages required for setup..."
 
-yum -y install wget bind-utils openssl || exiterr2
-yum -y install iproute gawk grep sed net-tools || exiterr2
+yum -y install wget bind-utils openssl iproute gawk grep sed net-tools || exiterr2
 
 bigecho "Trying to auto discover IP of this server..."
 
@@ -470,6 +469,10 @@ IPT_FILE="/etc/sysconfig/iptables"
 if ! grep -qs "hwdsl2 VPN script" "$IPT_FILE" \
    || ! iptables -t nat -C POSTROUTING -s "$L2TP_NET" -o "$NET_IFACE" -j MASQUERADE 2>/dev/null \
    || ! iptables -t nat -C POSTROUTING -s "$XAUTH_NET" -o "$NET_IFACE" -m policy --dir out --pol none -j MASQUERADE 2>/dev/null; then
+  ipt_flag=1
+fi
+
+if [[ "$CENTMINMOD" = [yY] ]]; then
   ipt_flag=1
 fi
 
