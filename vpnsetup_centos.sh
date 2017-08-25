@@ -446,8 +446,8 @@ net.ipv4.tcp_rmem = 10240 87380 12582912
 net.ipv4.tcp_wmem = 10240 87380 12582912
 EOF
   if [[ "$OPENVZ_OK" -eq '1' && ! "$(grep 'for openvz systems' /etc/sysctl.conf)" ]]; then
+      echo "#for openvz systems" >> /etc/sysctl.conf
     for dev in $(ls /proc/sys/net/ipv4/conf/); do
-      echo "for openvz systems" >> /etc/sysctl.conf
       echo "net.ipv4.conf.${dev}.accept_source_route=0" >> /etc/sysctl.conf
       echo "net.ipv4.conf.${dev}.accept_redirects=0" >> /etc/sysctl.conf
       echo "net.ipv4.conf.${dev}.send_redirects=0" >> /etc/sysctl.conf
@@ -455,6 +455,112 @@ EOF
     done
   fi
     sysctl -p
+fi
+
+# centminmod skips sysctl tunning when openvz is detected
+# need to resetup
+if [[ "$OPENVZ_OK" -eq '1' && "$CENTMINMOD" = [yY] ]]; then
+  if grep -qs "release 6" /etc/redhat-release; then
+    if [[ "$(grep 'centminmod added' /etc/sysctl.conf >/dev/null 2>&1; echo $?)" != '0' ]]; then
+cat >> "/etc/sysctl.conf" <<EOF
+# centminmod added
+fs.nr_open=12000000
+fs.file-max=9000000
+net.core.wmem_max=16777216
+net.core.rmem_max=16777216
+net.ipv4.tcp_rmem=8192 87380 16777216                                          
+net.ipv4.tcp_wmem=8192 65536 16777216
+net.core.netdev_max_backlog=8192
+net.core.somaxconn=8151
+net.core.optmem_max=8192
+net.ipv4.tcp_fin_timeout=10
+net.ipv4.tcp_keepalive_intvl=30
+net.ipv4.tcp_keepalive_probes=3
+net.ipv4.tcp_keepalive_time=240
+net.ipv4.tcp_max_syn_backlog=8192
+net.ipv4.tcp_sack=1
+net.ipv4.tcp_syn_retries=3
+net.ipv4.tcp_synack_retries = 2
+net.ipv4.tcp_tw_recycle = 0
+net.ipv4.tcp_tw_reuse = 0
+net.ipv4.tcp_max_tw_buckets = 1440000
+vm.swappiness=10
+vm.min_free_kbytes=65536
+net.ipv4.ip_local_port_range=1024 65535
+net.ipv4.tcp_slow_start_after_idle=0
+net.ipv4.tcp_rfc1337=1
+net.ipv4.conf.all.accept_redirects = 0
+net.ipv4.conf.all.accept_source_route = 0
+net.ipv4.conf.all.log_martians = 1
+net.ipv4.conf.all.rp_filter = 1
+net.ipv4.conf.all.secure_redirects = 0
+net.ipv4.conf.all.send_redirects = 0
+net.ipv4.conf.default.accept_redirects = 0
+net.ipv4.conf.default.accept_source_route = 0
+net.ipv4.conf.default.log_martians = 1
+net.ipv4.conf.default.rp_filter = 1
+net.ipv4.conf.default.secure_redirects = 0
+net.ipv4.conf.default.send_redirects = 0
+net.ipv4.icmp_echo_ignore_broadcasts = 1
+net.ipv4.icmp_ignore_bogus_error_responses = 1
+net.netfilter.nf_conntrack_helper=0
+net.netfilter.nf_conntrack_tcp_timeout_established = 28800
+net.netfilter.nf_conntrack_generic_timeout = 60
+net.ipv4.tcp_challenge_ack_limit = 999999999
+EOF
+    fi
+  else
+    touch /etc/sysctl.d/101-sysctl.conf
+    if [[ "$(grep 'centminmod added' /etc/sysctl.d/101-sysctl.conf >/dev/null 2>&1; echo $?)" != '0' ]]; then
+cat >> "/etc/sysctl.d/101-sysctl.conf" <<EOF
+# centminmod added
+fs.nr_open=12000000
+fs.file-max=9000000
+net.core.wmem_max=16777216
+net.core.rmem_max=16777216
+net.ipv4.tcp_rmem=8192 87380 16777216                                          
+net.ipv4.tcp_wmem=8192 65536 16777216
+net.core.netdev_max_backlog=8192
+net.core.somaxconn=8151
+net.core.optmem_max=8192
+net.ipv4.tcp_fin_timeout=10
+net.ipv4.tcp_keepalive_intvl=30
+net.ipv4.tcp_keepalive_probes=3
+net.ipv4.tcp_keepalive_time=240
+net.ipv4.tcp_max_syn_backlog=8192
+net.ipv4.tcp_sack=1
+net.ipv4.tcp_syn_retries=3
+net.ipv4.tcp_synack_retries = 2
+net.ipv4.tcp_tw_recycle = 0
+net.ipv4.tcp_tw_reuse = 0
+net.ipv4.tcp_max_tw_buckets = 1440000
+vm.swappiness=10
+vm.min_free_kbytes=65536
+net.ipv4.ip_local_port_range=1024 65535
+net.ipv4.tcp_slow_start_after_idle=0
+net.ipv4.tcp_limit_output_bytes=65536
+net.ipv4.tcp_rfc1337=1
+net.ipv4.conf.all.accept_redirects = 0
+net.ipv4.conf.all.accept_source_route = 0
+net.ipv4.conf.all.log_martians = 1
+net.ipv4.conf.all.rp_filter = 1
+net.ipv4.conf.all.secure_redirects = 0
+net.ipv4.conf.all.send_redirects = 0
+net.ipv4.conf.default.accept_redirects = 0
+net.ipv4.conf.default.accept_source_route = 0
+net.ipv4.conf.default.log_martians = 1
+net.ipv4.conf.default.rp_filter = 1
+net.ipv4.conf.default.secure_redirects = 0
+net.ipv4.conf.default.send_redirects = 0
+net.ipv4.icmp_echo_ignore_broadcasts = 1
+net.ipv4.icmp_ignore_bogus_error_responses = 1
+net.netfilter.nf_conntrack_helper=0
+net.netfilter.nf_conntrack_tcp_timeout_established = 28800
+net.netfilter.nf_conntrack_generic_timeout = 60
+net.ipv4.tcp_challenge_ack_limit = 999999999
+EOF
+    fi
+  fi
 fi
 
 # centminmod + centos 6
@@ -488,8 +594,8 @@ net.ipv4.conf.$NET_IFACE.rp_filter = 0
 EOF
 sed -i '/net.ipv4.conf.all.rp_filter = 1/d' /etc/sysctl.conf
   if [[ "$OPENVZ_OK" -eq '1' && ! "$(grep 'for openvz systems' /etc/sysctl.conf)" ]]; then
+      echo "#for openvz systems" >> /etc/sysctl.conf
     for dev in $(ls /proc/sys/net/ipv4/conf/); do
-      echo "for openvz systems" >> /etc/sysctl.conf
       echo "net.ipv4.conf.${dev}.accept_source_route=0" >> /etc/sysctl.conf
       echo "net.ipv4.conf.${dev}.accept_redirects=0" >> /etc/sysctl.conf
       echo "net.ipv4.conf.${dev}.send_redirects=0" >> /etc/sysctl.conf
@@ -532,8 +638,8 @@ sed -i '/net.ipv4.conf.all.rp_filter = 1/d' /etc/sysctl.d/101-sysctl.conf
 sed -i 's|net.ipv4.conf.default.rp_filter = .*|net.ipv4.conf.default.rp_filter = 0|' /usr/lib/sysctl.d/50-default.conf
 sed -i 's|net.ipv4.conf.all.rp_filter = .*|net.ipv4.conf.all.rp_filter = 0|' /usr/lib/sysctl.d/50-default.conf
   if [[ "$OPENVZ_OK" -eq '1' && ! "$(grep 'for openvz systems' /etc/sysctl.d/101-sysctl.conf)" ]]; then
+      echo "#for openvz systems" >> /etc/sysctl.d/101-sysctl.conf
     for dev in $(ls /proc/sys/net/ipv4/conf/); do
-      echo "for openvz systems" >> /etc/sysctl.d/101-sysctl.conf
       echo "net.ipv4.conf.${dev}.accept_source_route=0" >> /etc/sysctl.d/101-sysctl.conf
       echo "net.ipv4.conf.${dev}.accept_redirects=0" >> /etc/sysctl.d/101-sysctl.conf
       echo "net.ipv4.conf.${dev}.send_redirects=0" >> /etc/sysctl.d/101-sysctl.conf
@@ -668,6 +774,8 @@ fi
 
 # Reload sysctl.conf
 if [[ -f /etc/sysctl.d/101-sysctl.conf && "$CENTMINMOD" = [yY] ]]; then
+  /sbin/sysctl --system
+elif [[ "$OPENVZ_OK" -eq '1' && "$CENTMINMOD" = [yY] ]]; then
   /sbin/sysctl --system
 else
   sysctl -e -q -p
