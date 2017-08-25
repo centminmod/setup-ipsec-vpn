@@ -154,7 +154,23 @@ cd /opt/src || exiterr "Cannot enter /opt/src."
 
 bigecho "Installing packages required for setup..."
 
-yum -y install wget bind-utils openssl iproute gawk grep sed net-tools || exiterr2
+setuppackages='wget bind-utils openssl iproute gawk grep sed net-tools'
+
+for pkg in ${setuppackages[@]}; do
+  echo Processing package: $pkg
+  VPNRPMCHECK=$(rpm -ql $pkg >/dev/null 2>&1; echo $?)
+  if [[ "$VPNRPMCHECK" = '0' ]]; then
+    echo "----------------------------------------------------------------------------------"
+    echo "$pkg already installed"
+    echo "----------------------------------------------------------------------------------"
+  else
+    echo "----------------------------------------------------------------------------------"
+    echo "Installing $pkg"
+    echo "----------------------------------------------------------------------------------"
+    yum -q -y install "$pkg"
+    echo "----------------------------------------------------------------------------------"
+  fi
+done
 
 bigecho "Trying to auto discover IP of this server..."
 
@@ -180,18 +196,45 @@ fi
 
 bigecho "Installing packages required for the VPN..."
 
-yum -y install nss-devel nspr-devel pkgconfig pam-devel \
-  libcap-ng-devel libselinux-devel \
-  curl-devel flex bison gcc make \
-  fipscheck-devel unbound-devel xmlto || exiterr2
-yum -y install ppp xl2tpd || exiterr2
+vpnpackages='nss-devel nspr-devel pkgconfig pam-devel libcap-ng-devel libselinux-devel curl-devel flex bison gcc make fipscheck-devel unbound-devel xmlto ppp xl2tpd'
+
+for pkg in ${vpnpackages[@]}; do
+  echo Processing package: $pkg
+  VPNRPMCHECK=$(rpm -ql $pkg >/dev/null 2>&1; echo $?)
+  if [[ "$VPNRPMCHECK" = '0' ]]; then
+    echo "----------------------------------------------------------------------------------"
+    echo "$pkg already installed"
+    echo "----------------------------------------------------------------------------------"
+  else
+    echo "----------------------------------------------------------------------------------"
+    echo "Installing $pkg"
+    echo "----------------------------------------------------------------------------------"
+    yum -q -y install "$pkg"
+    echo "----------------------------------------------------------------------------------"
+  fi
+done
 
 if grep -qs "release 6" /etc/redhat-release; then
   yum -y remove libevent-devel
   yum -y install libevent2-devel || exiterr2
 else
-  yum -y install libevent-devel systemd-devel || exiterr2
-  yum -y install iptables-services || exiterr2
+  libeventpackages='libevent-devel systemd-devel iptables-services'
+  
+  for pkg in ${libeventpackages[@]}; do
+    echo Processing package: $pkg
+    VPNRPMCHECK=$(rpm -ql $pkg >/dev/null 2>&1; echo $?)
+    if [[ "$VPNRPMCHECK" = '0' ]]; then
+      echo "----------------------------------------------------------------------------------"
+      echo "$pkg already installed"
+      echo "----------------------------------------------------------------------------------"
+    else
+      echo "----------------------------------------------------------------------------------"
+      echo "Installing $pkg"
+      echo "----------------------------------------------------------------------------------"
+      yum -q -y install "$pkg"
+      echo "----------------------------------------------------------------------------------"
+    fi
+  done
 fi
 
 # skip fail2ban install if CSF Firewall is detected as
