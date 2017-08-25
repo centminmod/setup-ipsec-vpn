@@ -40,6 +40,26 @@ YOUR_PASSWORD=''
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 SYS_DT="$(date +%Y-%m-%d-%H:%M:%S)"; export SYS_DT
 
+if [ -f /proc/user_beancounters ]; then
+    CPUS=$(grep -c "processor" /proc/cpuinfo)
+    if [[ "$CPUS" -gt '8' ]]; then
+        CPUS=$(echo $(($CPUS+2)))
+    else
+        CPUS=$(echo $(($CPUS+1)))
+    fi
+    MAKETHREADS=" -j$CPUS"
+else
+    CPUS=$(grep -c "processor" /proc/cpuinfo)
+    if [[ "$CPUS" -gt '8' ]]; then
+        CPUS=$(echo $(($CPUS+4)))
+    elif [[ "$CPUS" -eq '8' ]]; then
+        CPUS=$(echo $(($CPUS+2)))
+    else
+        CPUS=$(echo $(($CPUS+1)))
+    fi
+    MAKETHREADS=" -j$CPUS"
+fi
+
 exiterr()  { echo "Error: $1" >&2; exit 1; }
 exiterr2() { echo "Error: 'yum install' failed." >&2; exit 1; }
 conf_bk() { /bin/cp -f "$1" "$1.old-$SYS_DT" 2>/dev/null; }
@@ -196,7 +216,7 @@ cat > Makefile.inc.local <<'EOF'
 WERROR_CFLAGS =
 USE_DNSSEC = false
 EOF
-make -s programs && make -s install
+make${MAKETHREADS} -s programs && make -s install
 
 # Verify the install and clean up
 cd /opt/src || exiterr "Cannot enter /opt/src."
