@@ -216,6 +216,7 @@ DNS_SRV1=${VPN_DNS_SRV1:-'8.8.8.8'}
 DNS_SRV2=${VPN_DNS_SRV2:-'8.8.4.4'}
 
 # Create IPsec (Libreswan) config
+echo "setup /etc/ipsec.conf"
 conf_bk "/etc/ipsec.conf"
 cat > /etc/ipsec.conf <<EOF
 version 2.0
@@ -270,12 +271,14 @@ conn xauth-psk
 EOF
 
 # Specify IPsec PSK
+echo "setup /etc/ipsec.secrets"
 conf_bk "/etc/ipsec.secrets"
 cat > /etc/ipsec.secrets <<EOF
 %any  %any  : PSK "$VPN_IPSEC_PSK"
 EOF
 
 # Create xl2tpd config
+echo "setup /etc/xl2tpd/xl2tpd.conf"
 conf_bk "/etc/xl2tpd/xl2tpd.conf"
 cat > /etc/xl2tpd/xl2tpd.conf <<EOF
 [global]
@@ -293,6 +296,7 @@ length bit = yes
 EOF
 
 # Set xl2tpd options
+echo "setup /etc/ppp/options.xl2tpd"
 conf_bk "/etc/ppp/options.xl2tpd"
 cat > /etc/ppp/options.xl2tpd <<EOF
 ipcp-accept-local
@@ -310,6 +314,7 @@ connect-delay 5000
 EOF
 
 # Create VPN credentials
+echo "setup /etc/ppp/chap-secrets"
 conf_bk "/etc/ppp/chap-secrets"
 cat > /etc/ppp/chap-secrets <<EOF
 # Secrets for authentication using CHAP
@@ -317,6 +322,7 @@ cat > /etc/ppp/chap-secrets <<EOF
 "$VPN_USER" l2tpd "$VPN_PASSWORD" *
 EOF
 
+echo "setup /etc/ipsec.d/passwd"
 conf_bk "/etc/ipsec.d/passwd"
 VPN_PASSWORD_ENC=$(openssl passwd -1 "$VPN_PASSWORD")
 cat > /etc/ipsec.d/passwd <<EOF
