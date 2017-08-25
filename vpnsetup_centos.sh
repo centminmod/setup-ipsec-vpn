@@ -334,7 +334,7 @@ else
 fi
 
 # non-centminmod centos 6 or 7
-if [[ "$(grep -qs "hwdsl2 VPN script" /etc/sysctl.conf)" && "$CENTMINMOD" = [nN] ]]; then
+if [[ ! "$(grep -qs "hwdsl2 VPN script" /etc/sysctl.conf)" && "$CENTMINMOD" = [nN] ]]; then
   conf_bk "/etc/sysctl.conf"
 cat >> /etc/sysctl.conf <<EOF
 
@@ -370,7 +370,7 @@ fi
 
 # centminmod + centos 6
 # some settings already added by centminmod lemp installer
-if [[ "$(grep -qs "hwdsl2 VPN script" /etc/sysctl.conf)" && "$CENTMINMOD" = [yY] && ! -f /etc/sysctl.d/101-sysctl.conf ]]; then
+if [[ ! "$(grep -qs "hwdsl2 VPN script" /etc/sysctl.conf)" && "$CENTMINMOD" = [yY] && ! -f /etc/sysctl.d/101-sysctl.conf ]]; then
   conf_bk "/etc/sysctl.conf"
 cat >> /etc/sysctl.conf <<EOF
 
@@ -402,7 +402,7 @@ fi
 
 # centminmod + centos 7
 # some settings already added by centminmod lemp installer
-if [[ "$(grep -qs "hwdsl2 VPN script" /etc/sysctl.d/101-sysctl.conf)" && "$CENTMINMOD" = [yY] && -f /etc/sysctl.d/101-sysctl.conf ]]; then
+if [[ ! "$(grep -qs "hwdsl2 VPN script" /etc/sysctl.d/101-sysctl.conf)" && "$CENTMINMOD" = [yY] && -f /etc/sysctl.d/101-sysctl.conf ]]; then
   conf_bk "/etc/sysctl.d/101-sysctl.conf"
 cat >> /etc/sysctl.d/101-sysctl.conf <<EOF
 
