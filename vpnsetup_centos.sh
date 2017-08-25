@@ -456,6 +456,8 @@ net.ipv4.conf.$NET_IFACE.rp_filter = 0
 #net.ipv4.icmp_ignore_bogus_error_responses = 1
 EOF
 sed -i '/net.ipv4.conf.all.rp_filter = 1/d' /etc/sysctl.d/101-sysctl.conf
+sed -i 's|net.ipv4.conf.default.rp_filter = .*|net.ipv4.conf.default.rp_filter = 0|' /usr/lib/sysctl.d/50-default.conf
+sed -i 's|net.ipv4.conf.all.rp_filter = .*|net.ipv4.conf.all.rp_filter = 0|' /usr/lib/sysctl.d/50-default.conf
 fi
 
 bigecho "Updating IPTables rules..."
@@ -611,6 +613,8 @@ elif [ -f /etc/csf/csf.conf ]; then
 fi
 service ipsec restart 2>/dev/null
 service xl2tpd restart 2>/dev/null
+# systemctl restart ipsec xl2tpd; csf -r; sleep 3; ipsec verify
+sleep 3; ipsec verify
 
 cat <<EOF
 
