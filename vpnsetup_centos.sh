@@ -11,6 +11,8 @@
 # modified version specific to Centmin Mod LEMP stacks with CSF Firewall
 # modified by George Liu centminmod.com
 # https://github.com/centminmod/setup-ipsec-vpn
+# 
+# curl -sL https://github.com/centminmod/setup-ipsec-vpn/raw/master/vpnsetup_centos.sh | bash
 #
 # Copyright (C) 2015-2017 Lin Song <linsongui@gmail.com>
 # Based on the work of Thomas Sarlandie (Copyright 2012)
