@@ -76,10 +76,19 @@ if ! grep -qs -e "release 6" -e "release 7" /etc/redhat-release; then
   exiterr "This script only supports CentOS/RHEL 6 and 7."
 fi
 
-if [ -f /proc/user_beancounters ]; then
+if [[ -f /proc/user_beancounters && "$(cat /dev/net/tun 2>&1 | grep 'bad state' >/dev/null 2>&1; echo $?)" -ne '0' ]]; then
   echo "Error: This script does not support OpenVZ VPS." >&2
   echo "Try OpenVPN: https://github.com/Nyr/openvpn-install" >&2
   exit 1
+elif [[ -f /proc/user_beancounters && "$(cat /dev/net/tun 2>&1 | grep 'bad state' >/dev/null 2>&1; echo $?)" -eq '0' ]]; then
+  OPENVZ_OK=1
+  if grep -qs "release 6" /etc/redhat-release; then
+    mkdir -p /var/run/pluto
+  else
+    echo "d      /var/run/pluto/         0755 root root" > /etc/tmpfiles.d/ipsec.conf
+    mkdir -p /var/run/pluto
+    systemctl daemon-reload
+  fi
 fi
 
 if [ "$(id -u)" != 0 ]; then
@@ -436,6 +445,16 @@ net.core.rmem_max = 12582912
 net.ipv4.tcp_rmem = 10240 87380 12582912
 net.ipv4.tcp_wmem = 10240 87380 12582912
 EOF
+  if [[ "$OPENVZ_OK" -eq '1' && ! "$(grep 'for openvz systems' /etc/sysctl.conf)" ]]; then
+    for dev in $(ls /proc/sys/net/ipv4/conf/); do
+      echo "for openvz systems" >> /etc/sysctl.conf
+      echo "net.ipv4.conf.${dev}.accept_source_route=0" >> /etc/sysctl.conf
+      echo "net.ipv4.conf.${dev}.accept_redirects=0" >> /etc/sysctl.conf
+      echo "net.ipv4.conf.${dev}.send_redirects=0" >> /etc/sysctl.conf
+      echo "net.ipv4.conf.${dev}.rp_filter=0" >> /etc/sysctl.conf
+    done
+  fi
+    sysctl -p
 fi
 
 # centminmod + centos 6
@@ -468,6 +487,16 @@ net.ipv4.conf.$NET_IFACE.rp_filter = 0
 #net.ipv4.icmp_ignore_bogus_error_responses = 1
 EOF
 sed -i '/net.ipv4.conf.all.rp_filter = 1/d' /etc/sysctl.conf
+  if [[ "$OPENVZ_OK" -eq '1' && ! "$(grep 'for openvz systems' /etc/sysctl.conf)" ]]; then
+    for dev in $(ls /proc/sys/net/ipv4/conf/); do
+      echo "for openvz systems" >> /etc/sysctl.conf
+      echo "net.ipv4.conf.${dev}.accept_source_route=0" >> /etc/sysctl.conf
+      echo "net.ipv4.conf.${dev}.accept_redirects=0" >> /etc/sysctl.conf
+      echo "net.ipv4.conf.${dev}.send_redirects=0" >> /etc/sysctl.conf
+      echo "net.ipv4.conf.${dev}.rp_filter=0" >> /etc/sysctl.conf
+    done
+  fi
+  sysctl -p
 fi
 
 # centminmod + centos 7
@@ -502,6 +531,15 @@ EOF
 sed -i '/net.ipv4.conf.all.rp_filter = 1/d' /etc/sysctl.d/101-sysctl.conf
 sed -i 's|net.ipv4.conf.default.rp_filter = .*|net.ipv4.conf.default.rp_filter = 0|' /usr/lib/sysctl.d/50-default.conf
 sed -i 's|net.ipv4.conf.all.rp_filter = .*|net.ipv4.conf.all.rp_filter = 0|' /usr/lib/sysctl.d/50-default.conf
+  if [[ "$OPENVZ_OK" -eq '1' && ! "$(grep 'for openvz systems' /etc/sysctl.d/101-sysctl.conf)" ]]; then
+    for dev in $(ls /proc/sys/net/ipv4/conf/); do
+      echo "for openvz systems" >> /etc/sysctl.d/101-sysctl.conf
+      echo "net.ipv4.conf.${dev}.accept_source_route=0" >> /etc/sysctl.d/101-sysctl.conf
+      echo "net.ipv4.conf.${dev}.accept_redirects=0" >> /etc/sysctl.d/101-sysctl.conf
+      echo "net.ipv4.conf.${dev}.send_redirects=0" >> /etc/sysctl.d/101-sysctl.conf
+      echo "net.ipv4.conf.${dev}.rp_filter=0" >> /etc/sysctl.d/101-sysctl.conf
+    done
+  fi
 fi
 
 bigecho "Updating IPTables rules..."
